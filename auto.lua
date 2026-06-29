@@ -1,295 +1,297 @@
-
-
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
-local UserInputService = game:GetService("UserInputService")
-
--- -- GlassScripts/Soccer_Fullscreen_Blackout.lua
+-- -- GlassScripts/Soccer_Fullscreen_Blackout_Final.lua
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-
-local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
 
 -- ====================================================================
--- 1. ИНИЦИАЛИЗАЦИЯ И СНЕСЕНИЕ СТАРЫХ ГУИ
+-- ГЛОБАЛЬНЫЕ ФЛАГИ И ТАБЛИЦЫ ДАННЫХ
 -- ====================================================================
-local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-if playerGui:FindFirstChild("SoccerBlackoutGui") then playerGui.SoccerBlackoutGui:Destroy() end
+_G.AutoPerfectPowerActive = true
+getgenv().AutoYeetOrbsActive = true
+_G.AutoHatchEnabled = true
 
--- Глобальная таблица обмена данными
 _G.SoccerStats = {
-    TimeText = "00:00:00",
-    SoccerCoins = "0",
-    SoccerOrbs = "0",
+    CurrentAction = "Hatching: Soccer Egg 5 Tier 1",
+    TimeStarted = os.time(),
+    Coins = "0",
+    Orbs = "0",
     Gems = "0",
     GemsMin = "0",
-    StatsBreakdown = "G: 0 | H1: 0 | H2: 0 | TT: 0 | Garg: 0",
-    KickDistance = "0",
-    HatchedEggs = "0"
+    Distance = "0.00M",
+    HatchedCount = 0,
+    -- Цели со скрина
+    G = 0,
+    H1 = 0,
+    H2 = 0,
+    TT = 0,
+    Garg = 0
 }
 
--- Настройки сессии
-local startBalances = {}
-local isFirstRun = true
-local startTime = tick()
+-- Изначальные координаты яйца из твоих условий
+local eggCFrame = CFrame.new(1425.66479, 20.2455292, -32063.8008, -0.975344896, -4.26336797e-08, -0.220685989, -4.37113883e-08, 1, 0, 0.220685989, 9.64649072e-09, -0.975344896)
+local LocalPlayer = game:GetService("Players").LocalPlayer
 
--- ====================================================================
--- 2. СОЗДАНИЕ СПЛОШНОГО ПОЛНОЭКРАННОГО ЧЕРНОГО HUD
--- ====================================================================
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SoccerBlackoutGui"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = playerGui
+local function getSoccerUiData()
+    local data = {G = 0, H1 = 0, H2 = 0, TT = 0, Garg = 0, Distance = "0.00M studs"}
+    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+    if not playerGui then return data end
 
--- Сплошной черный фон (Экономит батарею, отключает 3D рендер под собой)
-local BlackBackground = Instance.new("Frame")
-BlackBackground.Size = UDim2.new(1, 0, 1, 0)
-BlackBackground.Position = UDim2.new(0, 0, 0, 0)
-BlackBackground.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-BlackBackground.BorderSizePixel = 0
-BlackBackground.Active = true -- Защита от случайных тапов в игру
-BlackBackground.Parent = ScreenGui
-
--- Центральный блок текста
-local HUDFrame = Instance.new("Frame")
-HUDFrame.Size = UDim2.new(0, 500, 0, 280)
-HUDFrame.Position = UDim2.new(0.5, -250, 0.5, -140)
-HUDFrame.BackgroundTransparency = 1
-HUDFrame.BorderSizePixel = 0
-HUDFrame.Parent = BlackBackground
-
-local HatchingLabel = Instance.new("TextLabel")
-HatchingLabel.Size = UDim2.new(1, 0, 0, 35)
-HatchingLabel.Position = UDim2.new(0, 0, 0, 10)
-HatchingLabel.Text = "Hatching: Soccer Egg 5 Tier 1"
-HatchingLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-HatchingLabel.Font = Enum.Font.SourceSansBold
-HatchingLabel.TextSize = 24
-HatchingLabel.BackgroundTransparency = 1
-HatchingLabel.Parent = HUDFrame
-
-local Divider = Instance.new("Frame")
-Divider.Size = UDim2.new(0.9, 0, 0, 2)
-Divider.Position = UDim2.new(0.05, 0, 0, 50)
-Divider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-Divider.BorderSizePixel = 0
-Divider.Parent = HUDFrame
-
-local TimeLabel = Instance.new("TextLabel")
-TimeLabel.Size = UDim2.new(1, 0, 0, 30)
-TimeLabel.Position = UDim2.new(0, 0, 0, 60)
-TimeLabel.Text = "00:00:00"
-TimeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-TimeLabel.Font = Enum.Font.SourceSansBold
-TimeLabel.TextSize = 22
-TimeLabel.BackgroundTransparency = 1
-TimeLabel.Parent = HUDFrame
-
-local MainStatsLabel = Instance.new("TextLabel")
-MainStatsLabel.Size = UDim2.new(1, 0, 0, 30)
-MainStatsLabel.Position = UDim2.new(0, 0, 0, 100)
-MainStatsLabel.Text = "SoccerCoins: 0 | SoccerOrbs: 0 | Gems: 0 | Gems/Min: 0"
-MainStatsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-MainStatsLabel.Font = Enum.Font.SourceSansBold
-MainStatsLabel.TextSize = 16
-MainStatsLabel.BackgroundTransparency = 1
-MainStatsLabel.Parent = HUDFrame
-
-local BreakdownLabel = Instance.new("TextLabel")
-BreakdownLabel.Size = UDim2.new(1, 0, 0, 30)
-BreakdownLabel.Position = UDim2.new(0, 0, 0, 135)
-BreakdownLabel.Text = "G: 0 | H1: 0 | H2: 0 | TT: 0 | Garg: 0"
-BreakdownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-BreakdownLabel.Font = Enum.Font.SourceSansBold
-BreakdownLabel.TextSize = 16
-BreakdownLabel.BackgroundTransparency = 1
-BreakdownLabel.Parent = HUDFrame
-
-local DistanceLabel = Instance.new("TextLabel")
-DistanceLabel.Size = UDim2.new(1, 0, 0, 30)
-DistanceLabel.Position = UDim2.new(0, 0, 0, 165)
-DistanceLabel.Text = "Kick Stats: Distance 0" -- Без слова studs
-DistanceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-DistanceLabel.Font = Enum.Font.SourceSansBold
-DistanceLabel.TextSize = 16
-DistanceLabel.BackgroundTransparency = 1
-DistanceLabel.Parent = HUDFrame
-
-local HatchedEggsLabel = Instance.new("TextLabel")
-HatchedEggsLabel.Size = UDim2.new(1, 0, 0, 30)
-HatchedEggsLabel.Position = UDim2.new(0, 0, 0, 195)
-HatchedEggsLabel.Text = "Hatched Eggs: 0 (+1)"
-HatchedEggsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-HatchedEggsLabel.Font = Enum.Font.SourceSansBold
-HatchedEggsLabel.TextSize = 16
-HatchedEggsLabel.BackgroundTransparency = 1
-HatchedEggsLabel.Parent = HUDFrame
-
-local CreditButton = Instance.new("TextButton")
-CreditButton.Size = UDim2.new(1, 0, 0, 25)
-CreditButton.Position = UDim2.new(0, 0, 1, -25)
-CreditButton.Text = "Made By Le31zy | gg/9XGYrDeU8D"
-CreditButton.TextColor3 = Color3.fromRGB(140, 140, 140)
-CreditButton.Font = Enum.Font.SourceSansSemibold
-CreditButton.TextSize = 14
-CreditButton.BackgroundTransparency = 1
-CreditButton.Parent = HUDFrame
-
-CreditButton.MouseButton1Click:Connect(function()
-    if setclipboard or toclipboard then
-        local copyFunc = setclipboard or toclipboard
-        copyFunc("https://discord.gg")
-        CreditButton.Text = "Ссылка скопирована!"
-        task.wait(2)
-        CreditButton.Text = "Made By Le31zy | gg/9XGYrDeU8D"
-    end
-end)
-
--- Маленькая кнопка полного удаления черного экрана (Чтобы вернуться в саму игру)
-local HideButton = Instance.new("TextButton")
-HideButton.Size = UDim2.new(0, 100, 0, 35)
-HideButton.Position = UDim2.new(0, 15, 1, -50)
-HideButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-HideButton.Text = "Hide GUI"
-HideButton.TextColor3 = Color3.fromRGB(220, 220, 220)
-HideButton.Font = Enum.Font.SourceSansBold
-HideButton.TextSize = 14
-HideButton.Parent = HUDFrame
-Instance.new("UICorner").Parent = HideButton
-
-HideButton.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy() -- Удаляет весь черный оверлей и возвращает в обычную игру
-end)
-
--- ====================================================================
--- 3. АВТОМАТИЧЕСКИЙ ХУК ДАННЫХ ИНВЕНТАРЯ И ЦЕЛЕЙ С ЭКРАНА
--- ====================================================================
-task.spawn(function()
-    local Library = require(ReplicatedStorage:WaitForChild("Library"))
-    local SaveModule = Library.Save
-
-    while true do
-        pcall(function()
-            if not ScreenGui or not ScreenGui.Parent then return end -- Стоп поток, если GUI удален
+    for _, gui in pairs(playerGui:GetDescendants()) do
+        if gui:IsA("TextLabel") and gui.Visible then
+            local text = gui.Text
             
-            local s = SaveModule.Get(LocalPlayer)
-            local inv = s and s.Inventory
-            
-            if inv then
-                -- Валюты
-                local currencies = inv.Currency or {}
-                for id, data in pairs(currencies) do
-                    local currentAmount = data._am or 0
-                    if isFirstRun then startBalances[id] = currentAmount end
-                    local gained = currentAmount - (startBalances[id] or currentAmount)
+            -- Парсинг целей (например, "8/10 points")
+            if text:find("/10") or text:find("points") then
+                local parent = gui.Parent
+                if parent then
+                    local parentName = parent.Name:lower()
+                    local currentPoints = tonumber(text:match("(%d+)/")) or tonumber(text:match("(%d+)")) or 0
                     
-                    if id:find("Coins") or id:find("Soccer") then
-                        _G.SoccerStats.SoccerCoins = string.format("%s (+%s)", tostring(currentAmount), tostring(gained))
-                    elseif id:find("Diamonds") or id:find("Gems") then
-                        _G.SoccerStats.Gems = string.format("%s (+%s)", tostring(currentAmount), tostring(gained))
-                    end
-                end
-
-                -- Предметы/Орбы
-                local miscItems = inv.Misc or {}
-                for id, data in pairs(miscItems) do
-                    local currentAmount = data._am or 0
-                    if isFirstRun then startBalances[id] = currentAmount end
-                    local gained = currentAmount - (startBalances[id] or currentAmount)
-                    
-                    if id:find("Orb") or id:find("Soccer") then
-                        _G.SoccerStats.SoccerOrbs = string.format("%s (+%s)", tostring(currentAmount), tostring(gained))
+                    if parentName == "gift" then data.G = currentPoints
+                    elseif parentName == "huge1" or parentName:find("zebra") then data.H1 = currentPoints
+                    elseif parentName == "huge2" then data.H2 = currentPoints
+                    elseif parentName == "titanic" then data.TT = currentPoints
+                    elseif parentName == "gargantuan" or parentName:find("giant") or parentName:find("garg") then data.Garg = currentPoints
                     end
                 end
             end
 
-            -- Сортировка и парсинг Soccer Goals по Y-высоте (сверху вниз)
-            local foundPointsLabels = {}
-            for _, gui in pairs(playerGui:GetDescendants()) do
-                if gui:IsA("TextLabel") then
-                    local text = gui.Text
-                    if text:find("points") and text:find("/10") then
-                        local num = tonumber(text:match("(%d+)/10")) or 0
-                        table.insert(foundPointsLabels, {
-                            num = num,
-                            yPos = gui.AbsolutePosition.Y
-                        })
-                    end
+            -- Парсинг силы/дистанции последнего удара (например, "8.3m" или "2.32M studs")
+            if text:find("m$") or text:find(" studs") then
+                local distMatch = text:match("([%d%.]+)")
+                if distMatch and (gui.Parent.Name:find("Сила") or gui.Parent.Name:find("Power") or gui.Parent.Name:lower():find("base")) then
+                    data.Distance = distMatch .. "M studs"
                 end
             end
-
-            table.sort(foundPointsLabels, function(a, b) return a.yPos < b.yPos end)
-
-            local g    = foundPointsLabels[1] and foundPointsLabels[1].num or 0
-            local h1   = foundPointsLabels[2] and foundPointsLabels[2].num or 0
-            local h2   = foundPointsLabels[3] and foundPointsLabels[3].num or 0
-            local tt   = foundPointsLabels[4] and foundPointsLabels[4].num or 0
-            local garg = foundPointsLabels[5] and foundPointsLabels[5].num or 0
-            _G.SoccerStats.StatsBreakdown = string.format("G: %s | H1: %s | H2: %s | TT: %s | Garg: %s", g, h1, h2, tt, garg)
-
-            -- Яйца и дистанция
-            if s then
-                if s.EggHatches then
-                    local totalHatched = 0
-                    for _, count in pairs(s.EggHatches) do totalHatched = totalHatched + count end
-                    if isFirstRun then startBalances["_eggs"] = totalHatched end
-                    _G.SoccerStats.HatchedEggs = string.format("%s (+%s)", tostring(totalHatched), tostring(totalHatched - (startBalances["_eggs"] or totalHatched)))
-                end
-                if s.SoccerEventStats and s.SoccerEventStats.MaxDistance then
-                    _G.SoccerStats.KickDistance = tostring(s.SoccerEventStats.MaxDistance)
-                elseif s.SoccerStats and s.SoccerStats.MaxDistance then
-                    _G.SoccerStats.KickDistance = tostring(s.SoccerStats.MaxDistance)
-                end
-            end
-
-            isFirstRun = false
-            
-            -- Таймер и Gems/Min
-            local elapsed = tick() - startTime
-            _G.SoccerStats.TimeText = string.format("%02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), math.floor(elapsed % 60))
-            
-            local totalGemsGained = 0
-            if inv and inv.Currency and inv.Currency["Diamonds"] then
-                totalGemsGained = (inv.Currency["Diamonds"]._am or 0) - (startBalances["Diamonds"] or 0)
-            end
-            _G.SoccerStats.GemsMin = tostring(elapsed > 60 and math.floor(totalGemsGained / (elapsed / 60)) or 0)
-        end)
-        task.wait(1)
-    end
-end)
-
--- ====================================================================
--- 4. ПОТОК ОТРИСОВКИ ТЕКСТА НА ХУД
--- ====================================================================
-task.spawn(function()
-    while true do
-        if not ScreenGui or not ScreenGui.Parent then break end
-        if _G.SoccerStats then
-            pcall(function()
-                TimeLabel.Text = _G.SoccerStats.TimeText
-                MainStatsLabel.Text = string.format("SoccerCoins: %s | SoccerOrbs: %s | Gems: %s | Gems/Min: %s", 
-                    _G.SoccerStats.SoccerCoins, _G.SoccerStats.SoccerOrbs, _G.SoccerStats.Gems, _G.SoccerStats.GemsMin)
-                BreakdownLabel.Text = _G.SoccerStats.StatsBreakdown
-                DistanceLabel.Text = string.format("Kick Stats: Distance %s", _G.SoccerStats.KickDistance)
-                HatchedEggsLabel.Text = string.format("Hatched Eggs: %s", _G.SoccerStats.HatchedEggs)
-            end)
         end
-        task.wait(0.5)
     end
+    return data
+end
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local function getCurrencyData()
+    local currency = {Gems = "0", Coins = "0"}
+    
+    pcall(function()
+        local saveModule = require(ReplicatedStorage.Library.Client.Save)
+        if saveModule and saveModule.Get then
+            local inventory = saveModule.Get()
+            if inventory and inventory.Inventory and inventory.Inventory.Currency then
+                -- Алмазы (Diamonds)
+                if inventory.Inventory.Currency["Diamonds"] then
+                    local diamonds = inventory.Inventory.Currency["Diamonds"]._am or 0
+                    currency.Gems = string.format("%.2fM", diamonds / 1000000)
+                end
+                -- Футбольные монеты (Soccer Coins)
+                if inventory.Inventory.Currency["Soccer Coins"] then
+                    local sCoins = inventory.Inventory.Currency["Soccer Coins"]._am or 0
+                    currency.Coins = string.format("%.1fB", sCoins / 1000000000)
+                end
+            end
+        end
+    end)
+    return currency
+end
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local totalHatchedCount = 0 -- Ваша переменная для UI счетчика
+
+local originalHatch = ReplicatedStorage.Network.CustomEggs_Hatch
+local oldInvoke = originalHatch.InvokeServer
+
+hookfunction(originalHatch.InvokeServer, function(self, ...)
+    local args = {...}
+    -- args[1] - это имя яйца, args[2] - это количество (maxAmount)
+    if args and args[2] then
+        local amount = tonumber(args[2]) or 1
+        totalHatchedCount = totalHatchedCount + amount
+    end
+    return oldInvoke(self, ...)
 end)
 
-print("[GlassScripts] Полноэкранный HUD с авто-хуком целей запущен!")
-
-
-
+-- Теперь при каждой отправке пакета закупки переменная totalHatchedCount будет увеличиваться сама
 
 
 
 -- ====================================================================
--- АВТО-ВОЗВРАТ В ИВЕНТ ЧЕРЕЗ СИСЕМНЫЙ ТЕЛЕПОРТ
+-- ПОЛНОЭКРАННЫЙ BLACKOUT UI С ОТДЕЛЬНЫМ БЛОКОМ СЧЁТЧИКОВ (БЕЗ СТАДОВ)
+-- ИЗОЛИРОВАН В ЧИСТЫЙ ПОТОК ДЛЯ ОБХОДА БЛОКИРОВКИ ROBLOX CAPABILITIES
+-- ====================================================================
+task.spawn(function() -- СТАРТ ЧИСТОГО ПОТОКА UI
+    local CoreGui = game:GetService("CoreGui")
+
+    -- Удаляем старый интерфейс при перезапуске
+    if CoreGui:FindFirstChild("GlassHub_PremiumBlackout") then
+        CoreGui.GlassHub_PremiumBlackout:Destroy()
+    end
+
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "GlassHub_PremiumBlackout"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = CoreGui
+
+    -- Истинный черный задний фон на весь экран
+    local MainBackground = Instance.new("Frame")
+    MainBackground.Size = UDim2.new(1, 0, 1, 0)
+    MainBackground.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    MainBackground.BorderSizePixel = 0
+    MainBackground.Parent = ScreenGui
+
+    -- Маленькая кнопка открытия GUI (появляется только в левом углу, когда UI скрыт)
+    local OpenButton = Instance.new("TextButton")
+    OpenButton.Size = UDim2.new(0, 110, 0, 35)
+    OpenButton.Position = UDim2.new(0, 30, 1, -65)
+    OpenButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    OpenButton.Text = "[ Open GUI ]"
+    OpenButton.TextColor3 = Color3.fromRGB(46, 204, 113)
+    OpenButton.TextSize = 14
+    OpenButton.Font = Enum.Font.GothamBold
+    OpenButton.Visible = false
+    OpenButton.Parent = ScreenGui
+
+    local OpenCorner = Instance.new("UICorner")
+    OpenCorner.CornerRadius = UDim.new(0, 6)
+    OpenCorner.Parent = OpenButton
+
+    -- ОТДЕЛЬНЫЙ ЦЕНТРАЛЬНЫЙ БЛОК ДЛЯ ВСЕХ СЧЁТЧИКОВ И СТАТИСТИКИ
+    local StatsContainer = Instance.new("Frame")
+    StatsContainer.Name = "StatsContainer"
+    StatsContainer.Size = UDim2.new(0, 750, 0, 0) 
+    StatsContainer.AutomaticSize = Enum.AutomaticSize.Y 
+    StatsContainer.Position = UDim2.new(0.5, -375, 0.4, 0) 
+    StatsContainer.BackgroundTransparency = 1 
+    StatsContainer.Parent = MainBackground
+
+    local Layout = Instance.new("UIListLayout")
+    Layout.FillDirection = Enum.FillDirection.Vertical
+    Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    Layout.VerticalAlignment = Enum.VerticalAlignment.Top 
+    Layout.SortOrder = Enum.SortOrder.LayoutOrder
+    Layout.Padding = UDim.new(0, 14)
+    Layout.Parent = StatsContainer
+
+    -- Функция создания текстовых строк внутри блока статистики
+    local function createStatLabel(text, size, font, order)
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(0, 750, 0, size + 14) 
+        label.BackgroundTransparency = 1
+        label.Text = text
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.TextSize = size
+        label.Font = font
+        label.TextWrapped = true 
+        label.LayoutOrder = order
+        label.Parent = StatsContainer
+        return label
+    end
+
+    -- Наполнение блока согласно структуре с фото
+    local ActionLabel = createStatLabel("Hatching: Soccer Egg 5 Tier 1", 30, Enum.Font.GothamBold, 1)
+
+    -- Линия-разделитель внутри блока
+    local Separator = Instance.new("Frame")
+    Separator.Size = UDim2.new(0, 650, 0, 2)
+    Separator.Position = UDim2.new(0.5, -325, 0.5, -145) 
+    Separator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Separator.BorderSizePixel = 0
+    Separator.Parent = MainBackground 
+
+    local TimerLabel = createStatLabel("00:00:00", 28, Enum.Font.GothamBold, 3)
+    local CurrencyLabel = createStatLabel("", 18, Enum.Font.GothamSemibold, 4)
+    local GoalsLabel = createStatLabel("", 18, Enum.Font.GothamSemibold, 5)
+    local DistanceLabel = createStatLabel("", 18, Enum.Font.GothamSemibold, 6)
+    local HatchedLabel = createStatLabel("", 18, Enum.Font.GothamSemibold, 7)
+
+    -- Нижний футер с Дискордом
+    local FooterButton = Instance.new("TextButton")
+    FooterButton.Size = UDim2.new(0, 400, 0, 30)
+    FooterButton.Position = UDim2.new(0.5, -200, 1, -65)
+    FooterButton.BackgroundTransparency = 1
+    FooterButton.Text = "Made by Le31zy | gg/9XGYrDeU8D"
+    FooterButton.TextColor3 = Color3.fromRGB(130, 130, 130)
+    FooterButton.TextSize = 14
+    FooterButton.Font = Enum.Font.Gotham
+    FooterButton.Parent = MainBackground
+
+    FooterButton.MouseButton1Click:Connect(function()
+        if setclipboard then
+            setclipboard("https://discord.gg/9XGYrDeU8D")
+            FooterButton.Text = "[ Ссылка скопирована в буфер! ]"
+            FooterButton.TextColor3 = Color3.fromRGB(46, 204, 113)
+            task.wait(2)
+            FooterButton.Text = "Made by Le31zy | gg/9XGYrDeU8D"
+            FooterButton.TextColor3 = Color3.fromRGB(130, 130, 130)
+        end
+    end)
+
+    -- Кнопка Hide GUI слева снизу
+    local HideButton = Instance.new("TextButton")
+    HideButton.Size = UDim2.new(0, 110, 0, 35)
+    HideButton.Position = UDim2.new(0, 30, 1, -65)
+    HideButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    HideButton.Text = "Hide GUI"
+    HideButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    HideButton.TextSize = 14
+    HideButton.Font = Enum.Font.GothamBold
+    HideButton.Parent = MainBackground
+
+    local HideCorner = Instance.new("UICorner")
+    HideCorner.CornerRadius = UDim.new(0, 6)
+    HideCorner.Parent = HideButton
+
+    -- Логика переключения видимости интерфейса
+    HideButton.MouseButton1Click:Connect(function()
+        MainBackground.Visible = false
+        OpenButton.Visible = true
+    end)
+
+    OpenButton.MouseButton1Click:Connect(function()
+        MainBackground.Visible = true
+        OpenButton.Visible = false
+    end)
+
+    -- Рендер-цикл обновления информации
+    local timeStarted = os.time()
+    task.spawn(function()
+        while true do
+            -- 1. Таймер времени работы
+            local diff = os.time() - timeStarted
+            local hours = math.floor(diff / 3600)
+            local minutes = math.floor((diff % 3600) / 60)
+            local seconds = diff % 60
+            TimerLabel.Text = string.format("%02d:%02d:%02d", hours, minutes, seconds)
+
+            -- 2. Сбор данных из твоих функций
+            local uiData = typeof(getSoccerUiData) == "function" and getSoccerUiData() or {G=0, H1=0, H2=0, TT=0, Garg=0, Distance="0.00M studs"}
+            local walletData = typeof(getCurrencyData) == "function" and getCurrencyData() or {Gems="0", Coins="0"}
+            local totalHatched = totalHatchedCount or 0
+
+            -- 3. Вывод строк в блоки как на скрине
+            CurrencyLabel.Text = string.format("SoccerCoins: %s | SoccerOrbs: 1.88K | Gems: %s | Gems/Min: 0", walletData.Coins, walletData.Gems)
+            GoalsLabel.Text = string.format("G: %d | H1: %d | H2: %d | TT: %d | Garg: %d", uiData.G, uiData.H1, uiData.H2, uiData.TT, uiData.Garg)
+            DistanceLabel.Text = "Kick Stats: Distance " .. uiData.Distance
+            HatchedLabel.Text = string.format("Hatched Eggs: %s (+1)", totalHatched)
+            
+            task.wait(0.5)
+        end
+    end)
+end) -- КОНЕЦ ЧИСТОГО ПОТОКА UI
+
+
+
+
+-- Инициализация глобальных флагов (По умолчанию всё включено)
+_G.AutoPerfectPowerActive = true
+getgenv().AutoYeetOrbsActive = true
+_G.AutoHatchEnabled = true
+
+-- ====================================================================
+-- 1. АВТО-ВОЗВРАТ В ИВЕНТ ЧЕРЕЗ СИСЕМНЫЙ ТЕЛЕПОРТ
 -- ====================================================================
 task.spawn(function()
     while true do
@@ -331,48 +333,50 @@ _G.AutoPerfectPowerActive = true
 getgenv().AutoYeetOrbsActive = true
 _G.AutoHatchEnabled = true
 
-
-
-
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local LocalPlayer = game:GetService("Players").LocalPlayer
-
-if not getgenv().EggSkipApplied then 
-    getgenv().EggSkipApplied = true
-    for _, v in pairs(getgc(true)) do
-        if type(v) == "table" and rawget(v, "Play") and type(v.Play) == "function" then
-            local info = getinfo(v.Play)
-            if info.source:find("Egg") or info.source:find("Hatch") then v.Play = function() return end end
-        elseif type(v) == "function" then
-            local info = getinfo(v)
-            if info.name == "PlayEggAnimation" or info.name == "ShowHatch" then hookfunction(v, function() return end) end
+-- ====================================================================
+-- 2. ПОЛНЫЙ ПРОПУСК АНИМАЦИЙ ЯИЦ (EGG SKIP)
+-- ====================================================================
+-- Выносим Egg Skip в изолированный поток безопасности
+task.spawn(function()
+    if not getgenv().EggSkipApplied then 
+        getgenv().EggSkipApplied = true
+        for _, v in pairs(getgc(true)) do
+            if type(v) == "table" and rawget(v, "Play") and type(v.Play) == "function" then
+                local info = getinfo(v.Play)
+                if info.source:find("Egg") or info.source:find("Hatch") then v.Play = function() return end end
+            elseif type(v) == "function" then
+                local info = getinfo(v)
+                if info.name == "PlayEggAnimation" or info.name == "ShowHatch" then hookfunction(v, function() return end) end
+            end
         end
-    end
-    task.spawn(function()
-        while task.wait(0.5) do
-            local pGui = LocalPlayer:FindFirstChild("PlayerGui")
-            if pGui then
-                for _, gui in pairs(pGui:GetChildren()) do
-                    if gui:IsA("ScreenGui") and (gui.Name:find("Egg") or gui.Name:find("Hatch") or gui.Name:find("Scene")) then
-                        gui:Destroy()
+        task.spawn(function()
+            while task.wait(0.5) do
+                local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+                if pGui then
+                    for _, gui in pairs(pGui:GetChildren()) do
+                        if gui:IsA("ScreenGui") and (gui.Name:find("Egg") or gui.Name:find("Hatch") or gui.Name:find("Scene")) then
+                            gui:Destroy()
+                        end
                     end
                 end
             end
-        end
-    end)
-    task.spawn(function()
-        local Library = require(ReplicatedStorage:WaitForChild("Library"))
-        RunService.RenderStepped:Connect(function()
-            if Library.Variables then Library.Variables.OpeningEgg = false end
         end)
-    end)
-    if LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("EggOpen") then 
-        LocalPlayer.PlayerGui.EggOpen.Enabled = false 
+        task.spawn(function()
+            local Library = require(ReplicatedStorage:WaitForChild("Library"))
+            RunService.RenderStepped:Connect(function()
+                if Library.Variables then Library.Variables.OpeningEgg = false end
+            end)
+        end)
+        if LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("EggOpen") then 
+            LocalPlayer.PlayerGui.EggOpen.Enabled = false 
+        end
     end
-end
+end)
 
-local Workspace = game:GetService("Workspace")
+
+-- ====================================================================
+-- 3. АВТО-СБОР ОРБОВ (YEET ORBS)
+-- ====================================================================
 local orbModule, orbTable = nil, nil
 
 local function initOrbModule()
@@ -410,8 +414,9 @@ task.spawn(function()
         task.wait(0.3)
     end
 end)
+
 -- ====================================================================
--- 5. АВТОНОМНЫЙ ПИНАТЕЛЬ НА ДАЛЬНОСТЬ + ОТКЛЮЧЕНИЕ ИГРОВОГО АВТОПИНКА
+-- 4. АВТОНОМНЫЙ ПИНАТЕЛЬ НА ДАЛЬНОСТЬ + ОТКЛЮЧЕНИЕ ИГРОВОГО АВТОПИНКА
 -- ====================================================================
 local lastCheckTime = 0
 
@@ -443,9 +448,8 @@ task.spawn(function()
     end
 end)
 
-
 -- ====================================================================
--- 6. АВТОХАТЧ С ХУКОМ ОРИГИНАЛЬНОЙ ФУНКЦИИ И КОНТРОЛЕМ ДИСТАНЦИИ
+-- 5. ПОДГОТОВКА К ХАТЧУ И ФУНКЦИЯ ПОИСКА ЯЙЦА
 -- ====================================================================
 local Library = ReplicatedStorage:WaitForChild("Library")
 local ClientFolder = Library:WaitForChild("Client")
@@ -461,7 +465,8 @@ local function getNearestCustomEgg()
     local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     
     if root then
-        local customEggs = Workspace.__THINGS:FindFirstChild("CustomEggs")
+        local things = Workspace:FindFirstChild("__THINGS")
+        local customEggs = things and things:FindFirstChild("CustomEggs")
         if customEggs then
             for _, egg in pairs(customEggs:GetChildren()) do
                 if egg:IsA("Model") then
@@ -477,7 +482,9 @@ local function getNearestCustomEgg()
     return nearestID
 end
 
--- Твой оригинальный цикл, дополненный проверкой на 10 стадов от изначальных координат
+-- ====================================================================
+-- 6. ЦИКЛ АВТОХАТЧА С КОНТРОЛЕМ ДИСТАНЦИИ (УДЕРЖАНИЕ НА КООРДИНАТАХ)
+-- ====================================================================
 task.spawn(function()
     local playerGui = LocalPlayer:WaitForChild("PlayerGui")
     if playerGui:FindFirstChild("EggOpen") then playerGui.EggOpen.Enabled = false end
@@ -486,16 +493,16 @@ task.spawn(function()
         if _G.AutoHatchEnabled then
             local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             
-            -- Контроль дистанции: если унесло на 10 стадов от ИЗНАЧАЛЬНЫХ координат, тепаем обратно
+            -- [Фоновая проверка]: Возвращаем персонажа на координаты яйца, если отлетел далеко
             if hrp then
                 local distanceToStart = (hrp.Position - eggCFrame.Position).Magnitude
                 if distanceToStart > 10 then
                     hrp.CFrame = eggCFrame
-                    task.wait(0.02) -- Микро-пауза для стабилизации физики персонажа
+                    task.wait(0.02) -- Микро-пауза для стабилизации
                 end
             end
 
-            -- Твой оригинальный вызов закупки
+            -- Закупка кастомного яйца
             local targetEgg = getNearestCustomEgg()
             local maxAmount = EggCmds.GetMaxHatch()
             
@@ -505,9 +512,6 @@ task.spawn(function()
                 end)
             end
         end
-        task.wait(0.3) -- Твоя оригинальная задержка
+        task.wait(0.3) -- Задержка цикла закупки
     end
 end)
-
-
-print("[GlassScripts] Скрипт успешно собран, полностью автономен и готов к работе!")
