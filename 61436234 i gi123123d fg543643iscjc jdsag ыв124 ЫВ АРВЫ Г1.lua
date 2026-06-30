@@ -8,6 +8,14 @@ local LocalPlayer = Players.LocalPlayer
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 
+_G.GlassHubConfig = {
+    AutoKick = true,      -- Автоматический пинок мяча
+    AutoOrbs = true,      -- Авто-сбор орбов
+    AutoHatch = true,     -- Автоматическая закупка яиц
+    AntiAFK = true,       -- Прыжок раз в минуту
+    AntiLag = true,       -- Ультра-оптимизация FPS + AntiDetectLegit
+    AutoGifts = true,     -- Автооткрытие гифтов по 8 штук
+}
 -- Удаляем старый оверлей, если он уже был запущен
 if playerGui:FindFirstChild("GlassHubOverlay") then playerGui.GlassHubOverlay:Destroy() end
 
@@ -175,63 +183,6 @@ TimeLabel = createCenteredLabel("TimeLabel", "00:00:00", 3, 0.14)
 BreakdownLabel = createCenteredLabel("BreakdownLabel", "G: 0 | H1: 0 | H2: 0 | TT: 0 | Garg: 0", 4, 0.08)
 DistanceLabel = createCenteredLabel("DistanceLabel", "Kick Stats: Distance 0", 5, 0.08)
 HatchedEggsLabel = createCenteredLabel("Hatched Eggs: 0 (+0)", "Hatched Eggs: 0 (+0)", 6, 0.08)
--- ====================================================================
--- ДОБАВЛЕНИЕ СЕТКИ КНОПОК УПРАВЛЕНИЯ В ИНТЕРФЕЙС
--- ====================================================================
-local ToggleContainer = Instance.new("Frame")
-ToggleContainer.Name = "ToggleContainer"
-ToggleContainer.Size = UDim2.new(0.9, 0, 0.25, 0)
-ToggleContainer.BackgroundTransparency = 1
-ToggleContainer.LayoutOrder = 7
-ToggleContainer.Parent = HUDFrame
-
-local Grid = Instance.new("UIGridLayout")
-Grid.FillDirection = Enum.FillDirection.Horizontal
-Grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
-Grid.VerticalAlignment = Enum.VerticalAlignment.Center
-Grid.CellSize = UDim2.new(0.3, 0, 0.42, 0)
-Grid.CellPadding = UDim2.new(0.03, 0, 0.1, 0)
-Grid.Parent = ToggleContainer
-
-local function createConfigToggle(text, configKey, globalFlag)
-    local button = Instance.new("TextButton")
-    button.Name = configKey .. "Toggle"
-    button.Font = Enum.Font.SourceSansBold
-    button.TextScaled = true
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0.2, 0)
-    corner.Parent = button
-    
-    local function updateVisual()
-        local isActive = _G.GlassHubConfig[configKey]
-        button.Text = text .. ": " .. (isActive and "ON" or "OFF")
-        button.BackgroundColor3 = isActive and Color3.fromRGB(46, 139, 87) or Color3.fromRGB(178, 34, 34)
-    end
-    
-    button.MouseButton1Click:Connect(function()
-        local newValue = not _G.GlassHubConfig[configKey]
-        _G.GlassHubConfig[configKey] = newValue
-        
-        if globalFlag == "_G.AutoPerfectPowerActive" then _G.AutoPerfectPowerActive = newValue end
-        if globalFlag == "getgenv().AutoYeetOrbsActive" then getgenv().AutoYeetOrbsActive = newValue end
-        if globalFlag == "_G.AutoHatchEnabled" then _G.AutoHatchEnabled = newValue end
-        
-        updateVisual()
-    end)
-    
-    updateVisual()
-    button.Parent = ToggleContainer
-    return button
-end
-
-createConfigToggle("⚽ Auto Kick", "AutoKick", "_G.AutoPerfectPowerActive")
-createConfigToggle("💎 Auto Orbs", "AutoOrbs", "getgenv().AutoYeetOrbsActive")
-createConfigToggle("🥚 Auto Hatch", "AutoHatch", "_G.AutoHatchEnabled")
-createConfigToggle("🎁 Auto Gifts", "AutoGifts", nil)
-createConfigToggle("🦘 Anti AFK", "AntiAFK", nil)
-createConfigToggle("⚡ Anti Lag", "AntiLag", nil)
 
 -- Настройка копирайтов
 local CreditButton = Instance.new("TextButton")
