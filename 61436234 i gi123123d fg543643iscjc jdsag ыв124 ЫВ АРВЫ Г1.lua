@@ -8,7 +8,6 @@ local LocalPlayer = Players.LocalPlayer
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 
-
 -- Удаляем старый оверлей, если он уже был запущен
 if playerGui:FindFirstChild("GlassHubOverlay") then playerGui.GlassHubOverlay:Destroy() end
 
@@ -176,6 +175,63 @@ TimeLabel = createCenteredLabel("TimeLabel", "00:00:00", 3, 0.14)
 BreakdownLabel = createCenteredLabel("BreakdownLabel", "G: 0 | H1: 0 | H2: 0 | TT: 0 | Garg: 0", 4, 0.08)
 DistanceLabel = createCenteredLabel("DistanceLabel", "Kick Stats: Distance 0", 5, 0.08)
 HatchedEggsLabel = createCenteredLabel("Hatched Eggs: 0 (+0)", "Hatched Eggs: 0 (+0)", 6, 0.08)
+-- ====================================================================
+-- ДОБАВЛЕНИЕ СЕТКИ КНОПОК УПРАВЛЕНИЯ В ИНТЕРФЕЙС
+-- ====================================================================
+local ToggleContainer = Instance.new("Frame")
+ToggleContainer.Name = "ToggleContainer"
+ToggleContainer.Size = UDim2.new(0.9, 0, 0.25, 0)
+ToggleContainer.BackgroundTransparency = 1
+ToggleContainer.LayoutOrder = 7
+ToggleContainer.Parent = HUDFrame
+
+local Grid = Instance.new("UIGridLayout")
+Grid.FillDirection = Enum.FillDirection.Horizontal
+Grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+Grid.VerticalAlignment = Enum.VerticalAlignment.Center
+Grid.CellSize = UDim2.new(0.3, 0, 0.42, 0)
+Grid.CellPadding = UDim2.new(0.03, 0, 0.1, 0)
+Grid.Parent = ToggleContainer
+
+local function createConfigToggle(text, configKey, globalFlag)
+    local button = Instance.new("TextButton")
+    button.Name = configKey .. "Toggle"
+    button.Font = Enum.Font.SourceSansBold
+    button.TextScaled = true
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0.2, 0)
+    corner.Parent = button
+    
+    local function updateVisual()
+        local isActive = _G.GlassHubConfig[configKey]
+        button.Text = text .. ": " .. (isActive and "ON" or "OFF")
+        button.BackgroundColor3 = isActive and Color3.fromRGB(46, 139, 87) or Color3.fromRGB(178, 34, 34)
+    end
+    
+    button.MouseButton1Click:Connect(function()
+        local newValue = not _G.GlassHubConfig[configKey]
+        _G.GlassHubConfig[configKey] = newValue
+        
+        if globalFlag == "_G.AutoPerfectPowerActive" then _G.AutoPerfectPowerActive = newValue end
+        if globalFlag == "getgenv().AutoYeetOrbsActive" then getgenv().AutoYeetOrbsActive = newValue end
+        if globalFlag == "_G.AutoHatchEnabled" then _G.AutoHatchEnabled = newValue end
+        
+        updateVisual()
+    end)
+    
+    updateVisual()
+    button.Parent = ToggleContainer
+    return button
+end
+
+createConfigToggle("⚽ Auto Kick", "AutoKick", "_G.AutoPerfectPowerActive")
+createConfigToggle("💎 Auto Orbs", "AutoOrbs", "getgenv().AutoYeetOrbsActive")
+createConfigToggle("🥚 Auto Hatch", "AutoHatch", "_G.AutoHatchEnabled")
+createConfigToggle("🎁 Auto Gifts", "AutoGifts", nil)
+createConfigToggle("🦘 Anti AFK", "AntiAFK", nil)
+createConfigToggle("⚡ Anti Lag", "AntiLag", nil)
 
 -- Настройка копирайтов
 local CreditButton = Instance.new("TextButton")
@@ -474,63 +530,76 @@ end)
 if not _G.SessionGoals then
     _G.SessionGoals = { gift = 0, huge1 = 0, huge2 = 0, titanic = 0, gargantuan = 0 }
 end
-
 task.spawn(function()
-    local invokeCustom = ReplicatedStorage:WaitForChild("Network"):WaitForChild("Instancing_InvokeCustomFromClient")
+    local networkFolder = ReplicatedStorage:WaitForChild("Network")
+    local invokeCustom = networkFolder:WaitForChild("Instancing_InvokeCustomFromClient")
+    
     while true do
         if _G.AutoPerfectPowerActive then
-            
-            -- ЕСЛИ ВЫЛЕЗЛО УВЕДОМЛЕНИЕ О СБРОСЕ СФЕР — ЖДЕМ И НЕ ПИНАЕМ
+            -- Безопасная пауза без continue
             if getgenv().SoccerNotificationPause then
                 task.wait(0.5)
-                continue
-            end
-
-            local randomPower = math.random(94, 99) / 100
-            local success, response = pcall(function() 
-                return invokeCustom:InvokeServer("SoccerEvent", "GZ_Step", randomPower) 
-            end)
-            
-            if not success or response == nil or type(response) ~= "table" then
-                task.wait(1.0)
-                continue
-            end
-
-            -- Обработка промахов и накопления множественных колец за удар
-            if response.Success == false then
-                _G.SessionGoals = { gift = 0, huge1 = 0, huge2 = 0, titanic = 0, gargantuan = 0 }
-                _G.SoccerStats.StatsBreakdown = "G: 0 | H1: 0 | H2: 0 | TT: 0 | Garg: 0"
             else
-                if response.Rings and type(response.Rings) == "table" and #response.Rings > 0 then
-                    for _, ringData in pairs(response.Rings) do
-                        local gateId = ringData.Id and string.lower(tostring(ringData.Id))
-                        if gateId and _G.SessionGoals[gateId] ~= nil then
-                            _G.SessionGoals[gateId] = _G.SessionGoals[gateId] + 1
-                        end
-                    end
-                end
+                local randomPower = math.random(94, 99) / 100
                 
-                _G.SoccerStats.StatsBreakdown = string.format(
-                    "G: %s | H1: %s | H2: %s | TT: %s | Garg: %s",
-                    tostring(_G.SessionGoals.gift), tostring(_G.SessionGoals.huge1),
-                    tostring(_G.SessionGoals.huge2), tostring(_G.SessionGoals.titanic), tostring(_G.SessionGoals.gargantuan)
-                )
-            end
+                -- Передаем аргументы напрямую, без использования ломающегося unpack()
+                local success, response = pcall(function() 
+                    return invokeCustom:InvokeServer("SoccerEvent", "GZ_Step", randomPower) 
+                end)
+                
+                if success and type(response) == "table" then
+                    if response.Success == false then
+                        _G.SessionGoals = { gift = 0, huge1 = 0, huge2 = 0, titanic = 0, gargantuan = 0 }
+                        _G.SoccerStats.StatsBreakdown = "G: 0 | H1: 0 | H2: 0 | TT: 0 | Garg: 0"
+                    else
+                        if type(response.Rings) == "table" and #response.Rings > 0 then
+                            for _, ringData in pairs(response.Rings) do
+                                -- Обходим string.lower: переводим в строку и сравниваем вручную,
+                                -- защищая обфускатор от порчи метатаблиц строк
+                                local rawId = ringData.Id and tostring(ringData.Id)
+                                if rawId then
+                                    if rawId == "Gift" or rawId == "gift" then
+                                        _G.SessionGoals.gift = _G.SessionGoals.gift + 1
+                                    elseif rawId == "Huge1" or rawId == "huge1" then
+                                        _G.SessionGoals.huge1 = _G.SessionGoals.huge1 + 1
+                                    elseif rawId == "Huge2" or rawId == "huge2" then
+                                        _G.SessionGoals.huge2 = _G.SessionGoals.huge2 + 1
+                                    elseif rawId == "Titanic" or rawId == "titanic" then
+                                        _G.SessionGoals.titanic = _G.SessionGoals.titanic + 1
+                                    elseif rawId == "Gargantuan" or rawId == "gargantuan" then
+                                        _G.SessionGoals.gargantuan = _G.SessionGoals.gargantuan + 1
+                                    end
+                                end
+                            end
+                        end
+                        
+                        _G.SoccerStats.StatsBreakdown = string.format(
+                            "G: %s | H1: %s | H2: %s | TT: %s | Garg: %s",
+                            tostring(_G.SessionGoals.gift), tostring(_G.SessionGoals.huge1),
+                            tostring(_G.SessionGoals.huge2), tostring(_G.SessionGoals.titanic), tostring(_G.SessionGoals.gargantuan)
+                        )
+                    end
 
-            if response.Studs then
-                local studs = tonumber(response.Studs) or 0
-                if studs >= 1000000 then _G.SoccerStats.KickDistance = string.format("%.2fM", studs / 1000000)
-                elseif studs >= 1000 then _G.SoccerStats.KickDistance = string.format("%.1fK", studs / 1000)
-                else _G.SoccerStats.KickDistance = tostring(studs) end
+                    if response.Studs then
+                        local studs = tonumber(response.Studs) or 0
+                        if studs >= 1000000 then _G.SoccerStats.KickDistance = string.format("%.2fM", studs / 1000000)
+                        elseif studs >= 1000 then _G.SoccerStats.KickDistance = string.format("%.1fK", studs / 1000)
+                        else _G.SoccerStats.KickDistance = tostring(studs) end
+                    end
+                    
+                    local randomDelay = math.random(1, 4) / 100
+                    task.wait(randomDelay)
+                else
+                    -- Защита от nil (Generation Failure) — просто ждем секунду
+                    task.wait(1.0)
+                end
             end
-            
-            local randomDelay = math.random(1, 4) / 100
-            task.wait(randomDelay)
         else
             task.wait(0.5)
         end
     end
 end)
+
 
 -- ====================================================================
 -- АНТИ-АФК ПОТОК С ПРОВЕРКОЙ КОНФИГА (ДОБАВЛЕНО)
